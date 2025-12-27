@@ -8,11 +8,12 @@ dotenv.config();
 const { Pool } = pkg;
 
 const config = parse(process.env.DATABASE_URL);
+
 config.ssl = { rejectUnauthorized: false };
 config.port = parseInt(config.port);
-config.family = 4; // FORCE IPv4
+config.family = 4; 
 
-export const pool = new Pool(config);
+const pool = new Pool(config);
 
 async function testConnection() {
   try {
@@ -24,3 +25,5 @@ async function testConnection() {
 }
 
 testConnection();
+
+export default pool; 
