@@ -7,17 +7,12 @@ dotenv.config();
 
 const { Pool } = pkg;
 
-// Parse l'URL pour passer les options individuellement
 const config = parse(process.env.DATABASE_URL);
 config.ssl = { rejectUnauthorized: false };
-config.host = config.host; // hôte Supabase
 config.port = parseInt(config.port);
-config.user = config.user;
-config.password = config.password;
-config.database = config.database;
 config.family = 4; // FORCE IPv4
 
-const pool = new Pool(config);
+export const pool = new Pool(config);
 
 async function testConnection() {
   try {
@@ -29,5 +24,3 @@ async function testConnection() {
 }
 
 testConnection();
-
-export default pool;
