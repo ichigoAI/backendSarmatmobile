@@ -1,5 +1,5 @@
-import { pool } from "../../db.js"; 
-// Récupérer tous les services visibles
+import pool  from "../../db.js"; 
+
 export const getServices = async (req, res) => {
   try {
     const result = await pool.query(
