@@ -2,7 +2,22 @@
 import pool  from "../../db.js";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Vérifier que la clé Stripe existe
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.error("ERREUR: STRIPE_SECRET_KEY n'est pas définie dans les variables d'environnement");
+  console.error("Assurez-vous d'avoir un fichier .env avec STRIPE_SECRET_KEY");
+}
+
+// Initialiser Stripe avec vérification
+let stripe;
+try {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+    apiVersion: '2025-12-28', 
+  });
+} catch (error) {
+  console.error("Erreur d'initialisation Stripe:", error.message);
+}
 
 
 export const getPlans = async (req, res) => {
