@@ -98,18 +98,16 @@ export const login = async (req, res) => {
     // 🔗 Récupérer le profil lié
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id, full_name, email, type, plan_id")
+      .select("id, full_name, email, phone, type, plan_id, created_at") 
       .eq("id", userId)
       .single();
 
     if (profileError) {
       return res.status(404).json({ success: false, message: "Profil non trouvé" });
     }
-
-    // 🔧 CORRECTION : Retourner le token et refreshToken au bon format
     res.json({
       success: true,
-      token: data.session.access_token,  // Renommé de 'session' à 'token'
+      token: data.session.access_token, 
       refreshToken: data.session.refresh_token,
       user: profile
     });
@@ -232,74 +230,7 @@ export const getUser = async (req, res) => {
   res.json({ success: true, user });
 };
 
-// ------------------- UPDATE USER -------------------
-export const updateUser = async (req, res) => {
-  try {
-    const token = req.headers.authorization?.replace("Bearer ", "");
-    
-    if (!token) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "Token manquant" 
-      });
-    }
 
-    // Vérifier l'utilisateur
-    const { data: authData, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError) {
-      return res.status(401).json({ 
-        success: false, 
-        message: "Token invalide" 
-      });
-    }
-
-    const userId = req.params.userId;
-    
-    // Vérifier que l'utilisateur met à jour son propre profil
-    if (authData.user.id !== userId) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Accès interdit" 
-      });
-    }
-
-    const { full_name, phone, address } = req.body;
-
-    // Mise à jour du profil
-    const { data: updatedProfile, error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        full_name,
-        phone,
-        address
-      })
-      .eq("id", userId)
-      .select()
-      .single();
-
-    if (updateError) {
-      console.error('Update error:', updateError);
-      return res.status(400).json({ 
-        success: false, 
-        message: "Échec de la mise à jour" 
-      });
-    }
-
-    res.json({ 
-      success: true, 
-      user: updatedProfile,
-      message: "Profil mis à jour avec succès"
-    });
-
-  } catch (error) {
-    console.error('Update catch error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Erreur serveur" 
-    });
-  }
-};
 
 // ------------------- REFRESH TOKEN -------------------
 
@@ -319,4 +250,306 @@ export const refresh = async (req, res) => {
     refreshToken: data.session.refresh_token,
     user: data.user
   });
+};
+
+
+export const updateUser = async (req, res) => {
+  const startTime = Date.now();
+  const requestId = Math.random().toString(36).substring(7);
+  
+  console.log(`[UPDATE USER ${requestId}] Début de la requête`);
+
+  try {
+    // ===== VALIDATION DU TOKEN =====
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    
+    if (!token) {
+      console.log(`[UPDATE USER ${requestId}] Token manquant`);
+      return res.status(401).json({ 
+        success: false, 
+        message: "Authentification requise",
+        code: "TOKEN_MISSING"
+      });
+    }
+
+    // ===== VÉRIFICATION DE L'UTILISATEUR =====
+    console.log(`[UPDATE USER ${requestId}] Vérification du token`);
+    const { data: authData, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError) {
+      console.error(`[UPDATE USER ${requestId}] Token invalide:`, authError.message);
+      return res.status(401).json({ 
+        success: false, 
+        message: "Session expirée ou invalide",
+        code: "TOKEN_INVALID"
+      });
+    }
+
+    const authenticatedUserId = authData.user.id;
+    const requestedUserId = req.params.userId;
+
+    console.log(`[UPDATE USER ${requestId}] Auth userId: ${authenticatedUserId}, Requested userId: ${requestedUserId}`);
+
+    // ===== VÉRIFICATION DES PERMISSIONS =====
+    if (authenticatedUserId !== requestedUserId) {
+      console.warn(`[UPDATE USER ${requestId}] Tentative d'accès non autorisé`);
+      return res.status(403).json({ 
+        success: false, 
+        message: "Vous ne pouvez modifier que votre propre profil",
+        code: "FORBIDDEN_ACCESS"
+      });
+    }
+
+    // ===== VALIDATION DES DONNÉES =====
+    const { full_name, phone, email } = req.body;
+    
+    console.log(`[UPDATE USER ${requestId}] Données reçues:`, { 
+      full_name: full_name?.substring(0, 50) + (full_name?.length > 50 ? '...' : ''), 
+      phone: phone ? 'présent' : 'absent',
+      email: email ? 'présent' : 'absent'
+    });
+
+    const validationErrors = [];
+    const updates = {};
+
+    // Validation du nom complet
+    if (full_name !== undefined) {
+      const trimmedName = full_name?.trim();
+      if (!trimmedName || trimmedName.length === 0) {
+        validationErrors.push("Le nom complet ne peut pas être vide");
+      } else if (trimmedName.length > 100) {
+        validationErrors.push("Le nom complet ne peut pas dépasser 100 caractères");
+      } else {
+        updates.full_name = trimmedName;
+      }
+    }
+
+    // Validation du téléphone
+    if (phone !== undefined) {
+      if (phone === null || phone === '') {
+        updates.phone = null; // Permettre de supprimer le téléphone
+      } else {
+        const cleanedPhone = phone.replace(/\D/g, '');
+        if (cleanedPhone.length < 10 || cleanedPhone.length > 15) {
+          validationErrors.push("Le numéro de téléphone doit contenir entre 10 et 15 chiffres");
+        } else {
+          updates.phone = cleanedPhone;
+        }
+      }
+    }
+
+    // Validation de l'email (si fourni)
+    if (email !== undefined && email !== null) {
+      const trimmedEmail = email.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      
+      if (!trimmedEmail || trimmedEmail.length === 0) {
+        validationErrors.push("L'email ne peut pas être vide");
+      } else if (!emailRegex.test(trimmedEmail)) {
+        validationErrors.push("Format d'email invalide");
+      } else if (trimmedEmail.length > 100) {
+        validationErrors.push("L'email ne peut pas dépasser 100 caractères");
+      } else {
+        // Vérifier si l'email existe déjà pour un autre utilisateur
+        const { data: existingUser } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', trimmedEmail)
+          .neq('id', authenticatedUserId)
+          .single();
+
+        if (existingUser) {
+          validationErrors.push("Cet email est déjà utilisé par un autre compte");
+        } else {
+          updates.email = trimmedEmail;
+          
+          // Si l'email change, on devra aussi mettre à jour l'utilisateur auth
+          const { data: currentUser } = await supabase
+            .from('profiles')
+            .select('email')
+            .eq('id', authenticatedUserId)
+            .single();
+            
+          if (currentUser?.email !== trimmedEmail) {
+            updates.email_changed = true;
+          }
+        }
+      }
+    }
+
+    // Retourner les erreurs de validation si présentes
+    if (validationErrors.length > 0) {
+      console.log(`[UPDATE USER ${requestId}] Erreurs de validation:`, validationErrors);
+      return res.status(400).json({
+        success: false,
+        message: "Erreurs de validation",
+        errors: validationErrors,
+        code: "VALIDATION_ERROR"
+      });
+    }
+
+    // Vérifier qu'il y a des mises à jour à effectuer
+    if (Object.keys(updates).length === 0) {
+      console.log(`[UPDATE USER ${requestId}] Aucune donnée à mettre à jour`);
+      return res.status(400).json({
+        success: false,
+        message: "Aucune donnée à mettre à jour",
+        code: "NO_UPDATES"
+      });
+    }
+
+    // Ajouter la date de mise à jour
+    updates.updated_at = new Date().toISOString();
+
+    console.log(`[UPDATE USER ${requestId}] Mises à jour à appliquer:`, updates);
+
+    // ===== MISE À JOUR DANS SUPABASE =====
+    const { data: updatedProfile, error: updateError } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", authenticatedUserId)
+      .select(`
+        id,
+        full_name,
+        email,
+        phone,
+        type,
+        plan_id,
+        created_at,
+        updated_at
+      `)
+      .single();
+
+    if (updateError) {
+      console.error(`[UPDATE USER ${requestId}] Erreur Supabase:`, updateError);
+      
+      // Gestion des erreurs spécifiques Supabase
+      if (updateError.code === '23505') {
+        return res.status(409).json({
+          success: false,
+          message: "Un conflit de données est survenu",
+          code: "DUPLICATE_ENTRY"
+        });
+      }
+      
+      return res.status(500).json({
+        success: false,
+        message: "Erreur lors de la mise à jour de la base de données",
+        code: "DB_UPDATE_ERROR",
+        details: updateError.message
+      });
+    }
+
+    // ===== MISE À JOUR DE L'EMAIL DANS SUPABASE AUTH (si changé) =====
+    if (updates.email_changed && updates.email) {
+      try {
+        console.log(`[UPDATE USER ${requestId}] Mise à jour de l'email dans Supabase Auth`);
+        
+        // Utiliser l'API admin de Supabase pour mettre à jour l'email
+        // Note: Requiert le service_role key
+        const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
+          authenticatedUserId,
+          { email: updates.email }
+        );
+        
+        if (authUpdateError) {
+          console.warn(`[UPDATE USER ${requestId}] Impossible de mettre à jour l'email dans Auth:`, authUpdateError.message);
+          // On continue car le profil est déjà mis à jour
+        } else {
+          console.log(`[UPDATE USER ${requestId}] Email mis à jour dans Auth avec succès`);
+        }
+      } catch (authError) {
+        console.error(`[UPDATE USER ${requestId}] Erreur lors de la mise à jour Auth:`, authError);
+      }
+    }
+
+    // ===== RÉPONSE =====
+    const responseTime = Date.now() - startTime;
+    console.log(`[UPDATE USER ${requestId}] Requête terminée avec succès en ${responseTime}ms`);
+
+    res.json({ 
+      success: true, 
+      message: "Profil mis à jour avec succès",
+      user: updatedProfile,
+      updatedFields: Object.keys(updates).filter(key => !['updated_at', 'email_changed'].includes(key)),
+      requestId,
+      responseTime: `${responseTime}ms`
+    });
+
+  } catch (error) {
+    console.error(`[UPDATE USER ${requestId}] Erreur inattendue:`, error);
+    
+    // Gestion des erreurs inattendues
+    res.status(500).json({ 
+      success: false, 
+      message: "Une erreur inattendue est survenue",
+      code: "UNEXPECTED_ERROR",
+      requestId
+    });
+  }
+};
+
+/**
+ * Version simplifiée pour des mises à jour rapides
+ */
+export const updateUserPartial = async (req, res) => {
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  
+  if (!token) {
+    return res.status(401).json({ success: false, message: "Non authentifié" });
+  }
+
+  try {
+    // Vérification rapide du token
+    const { data: authData, error: authError } = await supabase.auth.getUser(token);
+    if (authError) throw new Error("Token invalide");
+
+    const userId = req.params.userId;
+    if (authData.user.id !== userId) {
+      return res.status(403).json({ success: false, message: "Accès interdit" });
+    }
+
+    // Nettoyer les données
+    const updates = {};
+    const { full_name, phone } = req.body;
+
+    if (full_name !== undefined) {
+      const trimmed = full_name?.trim();
+      if (trimmed && trimmed.length > 0 && trimmed.length <= 100) {
+        updates.full_name = trimmed;
+      }
+    }
+
+    if (phone !== undefined) {
+      updates.phone = phone ? phone.replace(/\D/g, '') : null;
+    }
+
+    // Vérifier s'il y a des mises à jour
+    if (Object.keys(updates).length === 0) {
+      return res.json({ success: true, message: "Aucun changement", user: null });
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    // Mise à jour
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", userId)
+      .select('id, full_name, email, phone, type')
+      .single();
+
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      message: "Profil mis à jour",
+      user: data,
+      updatedFields: Object.keys(updates).filter(key => key !== 'updated_at')
+    });
+
+  } catch (error) {
+    console.error('Update error:', error);
+    return res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
 };

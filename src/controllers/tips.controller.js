@@ -7,7 +7,6 @@ export const getTips = async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error("Failed to fetch tips:", err.message);
     res.status(500).json({ message: "Failed to fetch tips" });
   }
 };
@@ -28,7 +27,6 @@ export const addTip = async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("Erreur addTip:", err.message);
     res.status(500).json({ message: "Erreur lors de l'ajout du tip" });
   }
 };
@@ -50,7 +48,6 @@ export const updateTip = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("Erreur updateTip:", err.message);
     res.status(500).json({ message: "Erreur lors de la mise à jour du tip" });
   }
 };
@@ -71,7 +68,6 @@ export const deleteTip = async (req, res) => {
 
     res.json({ message: "Tip supprimé avec succès", tip: result.rows[0] });
   } catch (err) {
-    console.error("Erreur deleteTip:", err.message);
     res.status(500).json({ message: "Erreur lors de la suppression du tip" });
   }
 };

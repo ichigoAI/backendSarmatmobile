@@ -13,17 +13,29 @@ import {
 const router = express.Router();
 
 // Routes pour les services
-router.get("/services", getServices); // Récupérer tous les services visibles
-router.get("/services/:id", getServiceDetails); // Récupérer un service spécifique par ID
-router.post("/services", addService); // Ajouter un nouveau service
-router.post("/services/:serviceId/details", addServiceDetail); // Ajouter un détail de service
-
+router.get("/services", getServices); 
+router.get("/services/:id", getServiceDetails); 
 // Routes pour les questions d'un service
-router.get("/service-questions/:serviceId/", getServiceQuestions); // Récupérer les questions d'un service
-router.post("/service-questions/:serviceId/", addServiceQuestion); // Ajouter une question à un service
+router.get("/service-questions/:serviceId/", getServiceQuestions);
 
 // Routes pour le contenu (logos partenaires) d'un service
-router.get("/service-content/:serviceId/", getServiceContent); // Récupérer le contenu d'un service
-router.post("/service-content/:serviceId/", addServiceContent); // Ajouter un contenu (logo partenaire) à un service
+router.get("/service-content/:serviceId/", getServiceContent); 
+
+
+
+
+
+
+// Routes pour les services
+router.post("/services", addService); // Ajouter un nouveau service
+
+// Route pour ajouter les détails d'un service (sans serviceId dans l'URL)
+router.post("/services/details", addServiceDetail); // Ajouter un détail de service
+
+// Routes pour les questions d'un service
+router.post("/services/:serviceId/questions", addServiceQuestion); // Ajouter une question à un service
+
+router.post("/services/:serviceId/content", addServiceContent); // Ajouter un contenu (logo partenaire) à un service
+
 
 export default router;

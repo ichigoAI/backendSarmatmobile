@@ -8,6 +8,7 @@ import serviceRoutes from "./routes/serviceRoutes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import plansRoutes from "./routes/plans.routes.js";
 import usersRoutes from "./routes/users.routes.js"
+import advisorRoutes from './routes/advisor.routes.js';
 
 
 const app = express();
@@ -23,6 +24,7 @@ app.use("/api/tips", tipsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/advisor', advisorRoutes);
 
 
 // Test route (important)
