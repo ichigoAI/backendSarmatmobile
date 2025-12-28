@@ -7,7 +7,7 @@ import tipsRoutes from "./routes/tips.routes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import plansRoutes from "./routes/plans.routes.js";
-
+import usersRoutes from "./routes/users.routes.js"
 
 
 const app = express();
@@ -22,6 +22,8 @@ app.use("/api", serviceRoutes);
 app.use("/api/tips", tipsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/plans', plansRoutes);
+app.use('/api/users', usersRoutes);
+
 
 // Test route (important)
 app.get("/ping", (req, res) => {
