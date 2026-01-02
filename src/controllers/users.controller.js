@@ -235,21 +235,65 @@ export const getUser = async (req, res) => {
 // ------------------- REFRESH TOKEN -------------------
 
 export const refresh = async (req, res) => {
-  const { refreshToken } = req.body;
+  try {
+    const { refreshToken } = req.body;
 
-  if (!refreshToken) return res.status(400).json({ success: false, message: "No refresh token" });
+    // 1️⃣ Validation
+    if (!refreshToken || typeof refreshToken !== "string") {
+      return res.status(400).json({
+        success: false,
+        code: "REFRESH_TOKEN_MISSING",
+        message: "Refresh token manquant"
+      });
+    }
 
-  const { data, error } = await supabase.auth.refreshSession(refreshToken);
+    // 2️⃣ Refresh auprès de Supabase
+    const { data, error } = await supabase.auth.refreshSession({
+      refresh_token: refreshToken
+    });
 
-  if (error) return res.status(401).json({ success: false, message: "Invalid refresh token" });
+    if (error || !data?.session) {
+      console.warn("Refresh failed:", error?.message);
 
-  // data.session.access_token et data.session.refresh_token
-  res.json({
-    success: true,
-    token: data.session.access_token,
-    refreshToken: data.session.refresh_token,
-    user: data.user
-  });
+      return res.status(401).json({
+        success: false,
+        code: "REFRESH_TOKEN_INVALID",
+        message: "Session expirée, reconnexion requise"
+      });
+    }
+
+    const { access_token, refresh_token, expires_in } = data.session;
+
+    // 3️⃣ (Optionnel mais recommandé) Recharger le user proprement
+    const { data: userData, error: userError } =
+      await supabase.auth.getUser(access_token);
+
+    if (userError) {
+      return res.status(401).json({
+        success: false,
+        code: "USER_FETCH_FAILED",
+        message: "Utilisateur invalide après refresh"
+      });
+    }
+
+    // 4️⃣ Réponse claire pour le mobile
+    return res.json({
+      success: true,
+      token: access_token,
+      refreshToken: refresh_token,
+      expiresIn: expires_in, // utile côté mobile (debug)
+      userId: userData.user.id
+    });
+
+  } catch (err) {
+    console.error("Refresh crash:", err);
+
+    return res.status(500).json({
+      success: false,
+      code: "REFRESH_SERVER_ERROR",
+      message: "Erreur interne lors du refresh"
+    });
+  }
 };
 
 
